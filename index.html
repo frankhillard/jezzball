@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cordon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EDF1F3;
+    --grid: #D6DFE5;
+    --fill: #1E3047;
+    --hatch: #4A6785;
+    --edge-line: #7FA0BF;
+    --wall: #F2A100;
+    --wall-head: #FFD166;
+    --text: #1E3047;
+    --muted: #5C6F82;
+    --veil: rgba(237, 241, 243, 0.88);
+    --track: #D0DAE1;
+    color-scheme: light dark;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #101A24;
+      --grid: #1B2A38;
+      --fill: #2F4A66;
+      --hatch: #4B6E92;
+      --edge-line: #8FB0CC;
+      --text: #DCE6EE;
+      --muted: #8DA2B4;
+      --veil: rgba(16, 26, 36, 0.88);
+      --track: #223445;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #101A24;
+    --grid: #1B2A38;
+    --fill: #2F4A66;
+    --hatch: #4B6E92;
+    --edge-line: #8FB0CC;
+    --text: #DCE6EE;
+    --muted: #8DA2B4;
+    --veil: rgba(16, 26, 36, 0.88);
+    --track: #223445;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  html, body { margin: 0; }
+  body {
+    background: var(--paper);
+    color: var(--text);
+    font-family: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+    min-height: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 20px 16px 28px;
+  }
+  h1 {
+    font-family: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 2.1rem;
+    letter-spacing: -0.03em;
+    margin: 0;
+    line-height: 1;
+  }
+  .sub { margin: 6px 0 16px; color: var(--muted); font-size: 0.95rem; }
+
+  .hud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 22px;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .stat { display: flex; align-items: baseline; gap: 8px; }
+  .k { color: var(--muted); font-size: 0.85rem; }
+  .v {
+    font-family: "Bricolage Grotesque", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 1.25rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .pips { display: inline-flex; gap: 4px; align-items: center; min-height: 1.25rem; }
+  .pips i {
+    width: 11px; height: 11px; border-radius: 50%;
+    background: var(--wall);
+    box-shadow: 0 0 0 2px var(--text) inset;
+  }
+  .sealed { flex: 1 1 200px; min-width: 180px; align-items: center; }
+  .bar {
+    position: relative; flex: 1; height: 12px;
+    background: var(--track); border-radius: 6px; overflow: visible;
+  }
+  .bar .fillbar {
+    position: absolute; inset: 0 auto 0 0; width: 0%;
+    background: var(--text); border-radius: 6px;
+    transition: width 0.25s ease-out;
+  }
+  .bar .tick {
+    position: absolute; left: 75%; top: -4px; bottom: -4px; width: 2px;
+    background: var(--wall);
+  }
+
+  .board { position: relative; }
+  canvas {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 36 / 24;
+    border-radius: 6px;
+    cursor: crosshair;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; gap: 10px; padding: 20px;
+    background: var(--veil);
+    border-radius: 6px;
+  }
+  .overlay[hidden] { display: none; }
+  .overlay h2 {
+    font-family: "Bricolage Grotesque", system-ui, sans-serif;
+    font-size: 1.9rem; letter-spacing: -0.02em; margin: 0;
+  }
+  .overlay p { margin: 0; max-width: 34ch; line-height: 1.5; color: var(--muted); }
+  .overlay p strong { color: var(--text); font-weight: 600; }
+
+  button {
+    font: inherit; font-weight: 600;
+    background: var(--text); color: var(--paper);
+    border: 0; border-radius: 8px;
+    padding: 10px 20px; cursor: pointer;
+  }
+  button.ghost {
+    background: transparent; color: var(--text);
+    box-shadow: 0 0 0 2px var(--text) inset;
+    padding: 8px 14px;
+  }
+  button:focus-visible { outline: 3px solid var(--wall); outline-offset: 2px; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
+  .hint { color: var(--muted); font-size: 0.85rem; flex: 1 1 220px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bar .fillbar { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Cordon</h1>
+  <p class="sub">Build walls to trap the bouncing balls in smaller and smaller spaces. Seal off 75% of the board to clear the level.</p>
+
+  <div class="hud">
+    <div class="stat"><span class="k">Level</span><span class="v" id="level">1</span></div>
+    <div class="stat"><span class="k">Lives</span><span class="pips" id="lives" aria-live="polite"></span></div>
+    <div class="stat"><span class="k">Score</span><span class="v" id="score">0</span></div>
+    <div class="stat sealed">
+      <span class="k">Sealed</span><span class="v" id="pct">0%</span>
+      <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="bar">
+        <div class="fillbar" id="barfill"></div><div class="tick"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="board">
+    <canvas id="game" aria-label="Game board"></canvas>
+    <div class="overlay" id="overlay">
+      <h2 id="ovTitle">Cordon</h2>
+      <p id="ovText"></p>
+      <button id="ovBtn">Start</button>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="ghost" id="dirBtn" aria-pressed="false">Wall: vertical</button>
+    <button class="ghost" id="pauseBtn">Pause</button>
+    <span class="hint">Click to build. Right-click, Space or the button switches between vertical and horizontal walls.</span>
+  </div>
+</main>
+
+<script>
+(() => {
+  const COLS = 36, ROWS = 24, CS = 20, W = COLS * CS, H = ROWS * CS;
+  const R = 7;                 // ball radius
+  const TARGET = 75;           // % to seal
+  const GROW = 26;             // wall cells per second
+  const BALL_COLORS = ['#D6336C', '#1C7ED6', '#F08C00', '#2F9E44', '#7048E8', '#0CA678'];
+  const INTERIOR = (COLS - 2) * (ROWS - 2);
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const el = id => document.getElementById(id);
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---- canvas sizing ----
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // ---- colours from CSS tokens ----
+  let C = {}, pattern = null;
+  function makePattern(color) {
+    const p = document.createElement('canvas');
+    p.width = p.height = 8;
+    const g = p.getContext('2d');
+    g.strokeStyle = color; g.lineWidth = 1; g.globalAlpha = 0.55;
+    g.beginPath();
+    g.moveTo(0, 8); g.lineTo(8, 0);
+    g.moveTo(-2, 2); g.lineTo(2, -2);
+    g.moveTo(6, 10); g.lineTo(10, 6);
+    g.stroke();
+    return ctx.createPattern(p, 'repeat');
+  }
+  function readColors() {
+    const s = getComputedStyle(document.documentElement);
+    const g = n => s.getPropertyValue(n).trim();
+    C = { paper: g('--paper'), grid: g('--grid'), fill: g('--fill'), hatch: g('--hatch'),
+          edge: g('--edge-line'), wall: g('--wall'), head: g('--wall-head') };
+    pattern = makePattern(C.hatch);
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+  new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  // ---- state ----
+  let grid, fillAge, balls = [], halves = [];
+  let level = 1, lives = 2, score = 0, pct = 0, best = 0;
+  let state = 'menu';          // menu | playing | paused | levelclear | gameover
+  let vertical = true, hover = null, shake = 0;
+  try { best = parseInt(localStorage.getItem('cordon-best') || '0', 10) || 0; } catch (e) {}
+
+  const idx = (c, r) => r * COLS + c;
+  const solid = (c, r) => c < 0 || r < 0 || c >= COLS || r >= ROWS || grid[idx(c, r)] === 1;
+
+  function circleRect(x, y, rad, c, r) {
+    const rx = c * CS, ry = r * CS;
+    const nx = Math.max(rx, Math.min(x, rx + CS));
+    const ny = Math.max(ry, Math.min(y, ry + CS));
+    const dx = x - nx, dy = y - ny;
+    return dx * dx + dy * dy < rad * rad;
+  }
+  function hitsSolid(x, y) {
+    const c0 = Math.floor((x - R) / CS), c1 = Math.floor((x + R) / CS);
+    const r0 = Math.floor((y - R) / CS), r1 = Math.floor((y + R) / CS);
+    for (let r = r0; r <= r1; r++)
+      for (let c = c0; c <= c1; c++)
+        if (solid(c, r) && circleRect(x, y, R, c, r)) return true;
+    return false;
+  }
+
+  // ---- board setup ----
+  function newBoard(n) {
+    grid = new Uint8Array(COLS * ROWS);
+    fillAge = new Float32Array(COLS * ROWS).fill(99);
+    for (let c = 0; c < COLS; c++) { grid[idx(c, 0)] = 1; grid[idx(c, ROWS - 1)] = 1; }
+    for (let r = 0; r < ROWS; r++) { grid[idx(0, r)] = 1; grid[idx(COLS - 1, r)] = 1; }
+    halves = []; balls = []; pct = 0;
+    const speed = Math.min(130 + level * 10, 260);
+    for (let i = 0; i < n; i++) {
+      const a = 0.4 + Math.random() * 0.8;
+      balls.push({
+        x: (3 + Math.random() * (COLS - 6)) * CS,
+        y: (3 + Math.random() * (ROWS - 6)) * CS,
+        vx: Math.cos(a) * speed * (Math.random() < 0.5 ? 1 : -1),
+        vy: Math.sin(a) * speed * (Math.random() < 0.5 ? 1 : -1),
+        color: BALL_COLORS[i % BALL_COLORS.length]
+      });
+    }
+  }
+  function computePct() {
+    let n = 0;
+    for (let r = 1; r < ROWS - 1; r++) for (let c = 1; c < COLS - 1; c++) if (grid[idx(c, r)]) n++;
+    pct = n / INTERIOR * 100;
+  }
+
+  // ---- HUD / overlay ----
+  function updateHUD() {
+    el('level').textContent = level;
+    el('score').textContent = score;
+    const p = Math.floor(pct);
+    el('pct').textContent = p + '%';
+    el('barfill').style.width = Math.min(pct, 100) + '%';
+    el('bar').setAttribute('aria-valuenow', p);
+    const pips = el('lives');
+    const n = Math.max(0, Math.min(lives, 14));
+    if (pips.childElementCount !== n) {
+      pips.innerHTML = '<i></i>'.repeat(n);
+    }
+    pips.setAttribute('aria-label', lives + ' lives left');
+  }
+  function showOverlay(title, html, btn, action) {
+    el('ovTitle').textContent = title;
+    el('ovText').innerHTML = html;
+    const b = el('ovBtn');
+    b.textContent = btn;
+    b.onclick = action;
+    el('overlay').hidden = false;
+    b.focus({ preventScroll: true });
+  }
+  function hideOverlay() { el('overlay').hidden = true; }
+
+  // ---- game flow ----
+  function showMenu() {
+    state = 'menu';
+    level = 1; lives = 2; score = 0;
+    newBoard(4);
+    updateHUD();
+    showOverlay('Cordon',
+      'Click to grow a wall from both sides of the cursor. If a ball hits a wall while it is still growing, you lose a life. <strong>Seal off 75%</strong> to move on.',
+      'Start game', () => { level = 1; score = 0; startLevel(); });
+  }
+  function startLevel() {
+    lives = level + 1;
+    newBoard(Math.min(level + 1, 12));
+    state = 'playing';
+    hideOverlay();
+    updateHUD();
+  }
+  function saveBest() {
+    if (score > best) {
+      best = score;
+      try { localStorage.setItem('cordon-best', String(best)); } catch (e) {}
+    }
+  }
+  function levelClear() {
+    state = 'levelclear';
+    const bonus = lives * 100;
+    score += bonus;
+    saveBest();
+    updateHUD();
+    showOverlay('Level ' + level + ' cleared',
+      'You sealed <strong>' + Math.floor(pct) + '%</strong> with ' + lives + (lives === 1 ? ' life' : ' lives') + ' left. Bonus: <strong>' + bonus + '</strong> points.',
+      'Start level ' + (level + 1), () => { level++; startLevel(); });
+  }
+  function gameOver() {
+    state = 'gameover';
+    saveBest();
+    updateHUD();
+    showOverlay('Out of lives',
+      'You reached level ' + level + ' and sealed <strong>' + Math.floor(pct) + '%</strong>. Score: <strong>' + score + '</strong>. Best: <strong>' + best + '</strong>.',
+      'Play again', () => { level = 1; score = 0; startLevel(); });
+  }
+  function togglePause() {
+    if (state === 'playing') {
+      state = 'paused';
+      el('pauseBtn').textContent = 'Resume';
+      showOverlay('Paused', 'The balls are waiting.', 'Resume', togglePause);
+    } else if (state === 'paused') {
+      state = 'playing';
+      el('pauseBtn').textContent = 'Pause';
+      hideOverlay();
+    }
+  }
+
+  // ---- walls ----
+  function startWall(c, r) {
+    if (state !== 'playing' || halves.length || solid(c, r)) return;
+    const mk = (dx, dy, nx, ny) => ({ dx, dy, nx, ny, cells: [], state: 'growing', t: 1, committed: false });
+    if (vertical) halves = [mk(0, -1, c, r), mk(0, 1, c, r + 1)];
+    else halves = [mk(-1, 0, c, r), mk(1, 0, c + 1, r)];
+    halves.forEach(h => { h.vertical = vertical; });
+  }
+  function breakHalf(h, ball) {
+    h.state = 'broken';
+    h.cells = [];
+    if (ball) { if (h.vertical) ball.vx = -ball.vx; else ball.vy = -ball.vy; }
+    if (!reduceMotion) shake = 0.25;
+  }
+  function growStep(h) {
+    if (solid(h.nx, h.ny)) { h.state = 'done'; return; }
+    for (const b of balls) {
+      if (circleRect(b.x, b.y, R, h.nx, h.ny)) { breakHalf(h, b); return; }
+    }
+    h.cells.push([h.nx, h.ny]);
+    h.nx += h.dx; h.ny += h.dy;
+  }
+  function fillRegions() {
+    const seen = new Uint8Array(COLS * ROWS);
+    const ballCells = new Set(balls.map(b => idx(Math.floor(b.x / CS), Math.floor(b.y / CS))));
+    let gained = 0;
+    for (let i = 0; i < grid.length; i++) {
+      if (grid[i] || seen[i]) continue;
+      const stack = [i], cells = [];
+      let has = false;
+      seen[i] = 1;
+      while (stack.length) {
+        const k = stack.pop();
+        cells.push(k);
+        if (ballCells.has(k)) has = true;
+        const c = k % COLS, r = (k / COLS) | 0;
+        const ns = [idx(c - 1, r), idx(c + 1, r), idx(c, r - 1), idx(c, r + 1)];
+        for (const n of ns) if (!grid[n] && !seen[n]) { seen[n] = 1; stack.push(n); }
+      }
+      if (!has) {
+        for (const k of cells) { grid[k] = 1; fillAge[k] = 0; gained++; }
+      }
+    }
+    return gained;
+  }
+  function finalizeWall() {
+    const hit = halves.some(h => h.state === 'broken');
+    halves = [];
+    const gained = fillRegions();
+    score += gained * level;
+    if (hit) lives--;
+    computePct();
+    updateHUD();
+    if (pct >= TARGET) levelClear();
+    else if (lives <= 0) gameOver();
+  }
+
+  // ---- simulation ----
+  function stepBalls(dt) {
+    for (const b of balls) {
+      const nx = b.x + b.vx * dt;
+      if (hitsSolid(nx, b.y)) b.vx = -b.vx; else b.x = nx;
+      const ny = b.y + b.vy * dt;
+      if (hitsSolid(b.x, ny)) b.vy = -b.vy; else b.y = ny;
+    }
+  }
+  function update(dt) {
+    const steps = Math.max(1, Math.ceil(dt / (1 / 120)));
+    for (let i = 0; i < steps; i++) stepBalls(dt / steps);
+
+    if (shake > 0) shake = Math.max(0, shake - dt);
+    for (let i = 0; i < fillAge.length; i++) if (fillAge[i] < 1) fillAge[i] += dt;
+
+    if (state !== 'playing' || !halves.length) return;
+
+    // balls running into growing walls
+    for (const h of halves) {
+      if (h.state !== 'growing') continue;
+      outer:
+      for (const [c, r] of h.cells) {
+        for (const b of balls) {
+          if (circleRect(b.x, b.y, R, c, r)) { breakHalf(h, b); break outer; }
+        }
+      }
+    }
+    // growth
+    for (const h of halves) {
+      if (h.state !== 'growing') continue;
+      h.t += dt * GROW;
+      while (h.t >= 1 && h.state === 'growing') { h.t -= 1; growStep(h); }
+    }
+    // lock in finished halves
+    for (const h of halves) {
+      if (h.state === 'done' && !h.committed) {
+        for (const [c, r] of h.cells) grid[idx(c, r)] = 1;
+        h.committed = true;
+      }
+    }
+    if (halves.every(h => h.state !== 'growing')) finalizeWall();
+  }
+
+  // ---- drawing ----
+  function draw() {
+    ctx.save();
+    if (shake > 0) ctx.translate((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6);
+
+    ctx.fillStyle = C.paper;
+    ctx.fillRect(-10, -10, W + 20, H + 20);
+
+    // graph paper
+    ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 1; i < COLS; i++) { ctx.moveTo(i * CS + 0.5, 0); ctx.lineTo(i * CS + 0.5, H); }
+    for (let j = 1; j < ROWS; j++) { ctx.moveTo(0, j * CS + 0.5); ctx.lineTo(W, j * CS + 0.5); }
+    ctx.stroke();
+
+    // solid cells
+    ctx.fillStyle = C.fill;
+    ctx.beginPath();
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (grid[idx(c, r)]) ctx.rect(c * CS, r * CS, CS, CS);
+    ctx.fill();
+    ctx.fillStyle = pattern;
+    ctx.fill();
+
+    // crisp edge where solid meets open space
+    ctx.strokeStyle = C.edge; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (!grid[idx(c, r)]) continue;
+        const x = c * CS, y = r * CS;
+        if (c > 0 && !grid[idx(c - 1, r)]) { ctx.moveTo(x, y); ctx.lineTo(x, y + CS); }
+        if (c < COLS - 1 && !grid[idx(c + 1, r)]) { ctx.moveTo(x + CS, y); ctx.lineTo(x + CS, y + CS); }
+        if (r > 0 && !grid[idx(c, r - 1)]) { ctx.moveTo(x, y); ctx.lineTo(x + CS, y); }
+        if (r < ROWS - 1 && !grid[idx(c, r + 1)]) { ctx.moveTo(x, y + CS); ctx.lineTo(x + CS, y + CS); }
+      }
+    }
+    ctx.stroke();
+
+    // flash on newly sealed cells
+    for (let i = 0; i < fillAge.length; i++) {
+      if (fillAge[i] < 0.6) {
+        const c = i % COLS, r = (i / COLS) | 0;
+        ctx.fillStyle = 'rgba(242,161,0,' + (0.85 * (1 - fillAge[i] / 0.6)).toFixed(3) + ')';
+        ctx.fillRect(c * CS, r * CS, CS, CS);
+      }
+    }
+
+    // hover preview
+    if (hover && state === 'playing' && !halves.length && !solid(hover.c, hover.r)) {
+      const dx = vertical ? 0 : 1, dy = vertical ? 1 : 0;
+      ctx.fillStyle = 'rgba(242,161,0,0.22)';
+      for (const s of [-1, 1]) {
+        let c = hover.c, r = hover.r;
+        while (!solid(c, r)) { ctx.fillRect(c * CS, r * CS, CS, CS); c += dx * s; r += dy * s; }
+      }
+      ctx.fillStyle = 'rgba(242,161,0,0.6)';
+      ctx.fillRect(hover.c * CS, hover.r * CS, CS, CS);
+    }
+
+    // growing walls
+    for (const h of halves) {
+      if (!h.cells.length) continue;
+      ctx.fillStyle = C.wall;
+      for (const [c, r] of h.cells) ctx.fillRect(c * CS + 1, r * CS + 1, CS - 2, CS - 2);
+      if (h.state === 'growing') {
+        const [c, r] = h.cells[h.cells.length - 1];
+        ctx.fillStyle = C.head;
+        ctx.fillRect(c * CS + 1, r * CS + 1, CS - 2, CS - 2);
+      }
+    }
+
+    // balls
+    for (const b of balls) {
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      ctx.beginPath(); ctx.arc(b.x + 2, b.y + 3, R, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = b.color;
+      ctx.beginPath(); ctx.arc(b.x, b.y, R, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.beginPath(); ctx.arc(b.x - 2.4, b.y - 2.6, 2.2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ---- loop ----
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    if (state === 'playing' || state === 'menu') update(dt);
+    else if (shake > 0) shake = 0;
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  // ---- input ----
+  function cellFromEvent(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width * W;
+    const y = (e.clientY - rect.top) / rect.height * H;
+    return { c: Math.floor(x / CS), r: Math.floor(y / CS) };
+  }
+  function setDir(v) {
+    vertical = v;
+    el('dirBtn').textContent = 'Wall: ' + (vertical ? 'vertical' : 'horizontal');
+    el('dirBtn').setAttribute('aria-pressed', String(!vertical));
+  }
+  canvas.addEventListener('pointermove', e => { hover = cellFromEvent(e); });
+  canvas.addEventListener('pointerleave', () => { hover = null; });
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button === 2) { setDir(!vertical); return; }
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const cell = cellFromEvent(e);
+    hover = cell;
+    startWall(cell.c, cell.r);
+  });
+  el('dirBtn').addEventListener('click', () => setDir(!vertical));
+  el('pauseBtn').addEventListener('click', togglePause);
+  window.addEventListener('keydown', e => {
+    if (e.target && e.target.tagName === 'BUTTON') return;
+    if (e.code === 'Space') { e.preventDefault(); setDir(!vertical); }
+    else if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') togglePause();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && state === 'playing') togglePause();
+  });
+
+  showMenu();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
